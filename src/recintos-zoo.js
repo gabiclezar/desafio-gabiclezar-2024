@@ -1,11 +1,12 @@
 class RecintosZoo {
 
     analisaRecintos(animal, quantidade) {
+         return encontrarRecintosViaveis(animal, quantidade)
     }
 
 }
 
-// Definição dos recintos existentes
+// Descrição dos recintos
 const recintos = [
     { numero: 1, bioma: 'savana', tamanhoTotal: 10, animaisExistentes: [{ especie: 'MACACO', quantidade: 3 }] },
     { numero: 2, bioma: 'floresta', tamanhoTotal: 5, animaisExistentes: [] },
@@ -14,7 +15,7 @@ const recintos = [
     { numero: 5, bioma: 'savana', tamanhoTotal: 9, animaisExistentes: [{ especie: 'LEAO', quantidade: 1 }] }
 ];
 
-// Definição dos animais habilitados
+// Descrição dos animais
 const animaisPermitidos = {
     LEAO: { tamanho: 3, biomas: ['savana'], carnivoro: true },
     LEOPARDO: { tamanho: 2, biomas: ['savana'], carnivoro: true },
@@ -28,83 +29,70 @@ const animaisPermitidos = {
 function encontrarRecintosViaveis(especie, quantidade) {
     // Validar entrada
     if (!animaisPermitidos[especie]) {
-        return "Animal inválido";
+        return {erro: "Animal inválido"};
     }
     if (isNaN(quantidade) || quantidade <= 0) {
-        return "Quantidade inválida";
+        return {erro: "Quantidade inválida"};
     }
 
-    const animalInfo = animaisPermitidos[especie];
-    const tamanhoNecessario = quantidade * animalInfo.tamanho;
+    let resposta = {
+        recintosViaveis: []
+    }
 
-    const recintosViaveis = recintos.filter(recinto => {
-        const animaisExistentes = recinto.animaisExistentes;
-        let espacoOcupado = animaisExistentes.reduce((total, animal) => {
-            return total + animal.quantidade * animaisPermitidos[animal.especie].tamanho;
-        }, 0);
+    let animalInfo = animaisPermitidos[especie];
+    let tamanhoNecessario = quantidade * animalInfo.tamanho;
+
+    //verifica se o recinto é do bioma que o animal precisa
+     recintos.forEach(recinto => {
+        if (!animalInfo.biomas.some(bioma => recinto.bioma.includes(bioma))){
+            return
+        }
         
-        // Verifica se o bioma do recinto é compatível
-        if (!animalInfo.biomas.includes(recinto.bioma) && recinto.bioma !== 'savana e rio') {
-            return false;
+        //Calcula o espaço livre 
+        let espacoLivre = recinto.tamanhoTotal - recinto.animaisExistentes.reduce((soma, animal) => soma + (animal.quantidade * animaisPermitidos[animal.especie].tamanho), 0)
+
+        //se houver espécies diferentes é ocupado um espaço extra
+        if (recinto.animaisExistentes.length >= 1 && recinto.animaisExistentes.some(animal => animal.especie != especie)) {
+            espacoLivre -= 1
         }
 
-        // Verifica se o recinto tem espaço suficiente
-        const espacoLivre = recinto.tamanhoTotal - espacoOcupado;
-        if (espacoLivre < tamanhoNecessario) {
-            return false;
+        //Verifica se há espaço livre para os animais
+        if (espacoLivre < (animalInfo.tamanho * quantidade)){
+            return 
         }
 
-        // Regra para carnivoros: só podem habitar com a própria espécie
-        if (animalInfo.carnivoro && animaisExistentes.length > 0 && animaisExistentes[0].especie !== especie) {
-            return false;
+        //Verifica se o animal é carnívoro e se ele pode ficar no recinto
+        if (animalInfo.carnivoro && recinto.animaisExistentes.some(animal => animal.especie != especie)){
+            return 
         }
 
-        // Regra para hipopotamos: só convivem com outras espécies em bioma "savana e rio"
-        if (especie === 'HIPOPOTAMO' && recinto.bioma !== 'savana e rio' && animaisExistentes.length > 0) {
-            return false;
+        //Se não for carnívoro, verifica se há carnívoros no recinto
+        if (!animalInfo.carnivoro && recinto.animaisExistentes.some(animal => animaisPermitidos[animal.especie].carnivoro)){
+            return
         }
 
-        // Regra para macacos: não podem ficar sozinhos
-        if (especie === 'MACACO' && animaisExistentes.length === 0 && quantidade === 1) {
-            return false;
+        //Verifica de o hipopótamo pode compatilhar esse recinto
+        if (especie == 'HIPOPOTAMO' && recinto.animaisExistentes.length > 1 && recinto.bioma != 'savana e rio'){
+            return
         }
 
-        // Verifica se os animais existentes continuarão confortáveis com os novos
-        for (const animal of animaisExistentes) {
-            const especieExistente = animaisPermitidos[animal.especie];
-            if (especieExistente.carnivoro && especieExistente.especie !== especie) {
-                return false;
-            }
+        //Verifica se o macaco tem companhia
+        if (especie == 'MACACO' && recinto.animaisExistentes.length == 0 && quantidade == 1){
+            return
         }
 
-        // Considerar espaço extra se houver mais de uma espécie no recinto
-        if (animaisExistentes.length > 0 && !animaisExistentes.some(animal => animal.especie === especie)) {
-            espacoOcupado += 1;
-        }
-
-        return espacoLivre >= tamanhoNecessario + (animaisExistentes.length > 0 ? 1 : 0);
+        //Adiciona recinto na resposta
+        resposta.recintosViaveis.push(`Recinto ${recinto.numero} (espaço livre: ${espacoLivre - (animalInfo.tamanho * quantidade)} total: ${recinto.tamanhoTotal})`)
     });
 
-    // Ordenar recintos viáveis e formatar a resposta
-    if (recintosViaveis.length === 0) {
-        return "Não há recinto viável";
+    //Se não tiver recinto viável retorna erro
+    if (resposta.recintosViaveis.length == 0){
+        return {
+            erro: 'Não há recinto viável'
+        }
     }
 
-    return recintosViaveis.map(recinto => {
-        const espacoOcupado = recinto.animaisExistentes.reduce((total, animal) => {
-            return total + animal.quantidade * animaisPermitidos[animal.especie].tamanho;
-        }, 0);
-        const espacoLivre = recinto.tamanhoTotal - espacoOcupado - (recinto.animaisExistentes.length > 0 ? 1 : 0);
-        return `Recinto nro ${recinto.numero} (espaço livre: ${espacoLivre}, total: ${recinto.tamanhoTotal})`;
-    });
+    return resposta 
 }
-
-// Exemplos de uso:
-console.log(encontrarRecintosViaveis('LEAO', 1)); // Deve indicar os recintos disponíveis para o leão
-console.log(encontrarRecintosViaveis('MACACO', 2)); // Deve indicar os recintos disponíveis para os macacos
-console.log(encontrarRecintosViaveis('CROCODILO', 3)); // Deve indicar os recintos disponíveis para os crocodilos
-console.log(encontrarRecintosViaveis('HIPOPOTAMO', 1)); // Deve indicar os recintos disponíveis para o hipopótamo
-console.log(encontrarRecintosViaveis('ELEFANTE', 1)); // Deve retornar "Animal inválido"
-
 
 export { RecintosZoo as RecintosZoo };
